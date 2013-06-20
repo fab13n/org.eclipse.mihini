@@ -29,7 +29,7 @@ INCLUDE_DIRECTORIES(
 # Transport-independent part
 ADD_LUA_LIBRARY(modbus_serializer DESTINATION modbus EXCLUDE_FROM_ALL ${MODBUS_SRC})
 SET_TARGET_PROPERTIES(modbus_serializer PROPERTIES OUTPUT_NAME serializer)
-TARGET_LINK_LIBRARIES(modbus_serializer lib_modbus)
+TARGET_LINK_LIBRARIES(modbus_serializer lib_modbus lib_returncodes)
 ADD_DEPENDENCIES(modbus_serializer sched serial)
 
 # Modbus over UART
@@ -39,3 +39,11 @@ ADD_DEPENDENCIES(modbus_serial modbus_serializer)
 # Modbus over TCP
 ADD_LUA_LIBRARY(modbus_tcp EXCLUDE_FROM_ALL modbus/modbustcp.lua)
 ADD_DEPENDENCIES(modbus_tcp modbus_serializer socket_sched pack)
+
+# Test
+ADD_LUA_LIBRARY(test_modbusserializer DESTINATION tests EXCLUDE_FROM_ALL
+                test/modbusserializer.lua)
+ADD_DEPENDENCIES(test_modbusserializer modbus_serializer)
+
+INSTALL(FILES modbus/modbus.lua modbus/modbustcp.lua DESTINATION lua)
+INSTALL(TARGETS modbus_serializer LIBRARY DESTINATION lua/modbus)

@@ -6,3 +6,5 @@ scratch
 .cproject
 .buildpath
 bin/lua
+build_version
+porting/archlinux/mihini.tar.gz
