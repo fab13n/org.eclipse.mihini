@@ -605,7 +605,7 @@ local function init()
 
 	-- register rest commands
 	if type(config.rest) == "table" and config.rest.activate == true then
-	   local rest = require 'agent.rest'
+	   local rest = require 'web.rest'
 	   rest.register("update[/%w%?]*$", "POST", rest_localupdate_handler, update_sink())
 	   rest.register("update[/%w%?]*$", "GET", rest_status_handler)
 	else

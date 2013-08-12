@@ -12,7 +12,7 @@
 PROJECT(MIHINI_WEB)
 
 ADD_LUA_LIBRARY(web EXCLUDE_FROM_ALL DESTINATION web
-    server.lua compile.lua session.lua template.lua)
+    server.lua compile.lua session.lua template.lua rest.lua)
 ADD_LUA_LIBRARY(web_auth EXCLUDE_FROM_ALL DESTINATION web/auth
     auth/basic.lua auth/digest.lua)
 ADD_DEPENDENCIES(web sched socket_sched)

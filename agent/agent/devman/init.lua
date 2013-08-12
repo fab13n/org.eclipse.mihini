@@ -167,7 +167,7 @@ function M.init(cfg)
 
     -- register rest commands
     if type(config.rest) == "table" and config.rest.activate == true  then
-       local rest = require 'agent.rest'
+       local rest = require 'web.rest'
        rest.register("devicetree/[%w.]+", "GET", rest_get_handler)
        rest.register("devicetree/[%w.]+", "PUT", rest_set_handler)
     else
