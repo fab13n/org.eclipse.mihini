@@ -453,7 +453,7 @@ web.site['ajax'] = function (echo, env)
    local func_name = env.params.f
    local f = web.ajax.exported_functions[func_name]
    if not f then
-      error("Remote invocation of non-exported function "..(func_name or "nil"))
+      return nil, "Remote invocation of non-exported function : " .. (func_name or "nil")
    end
 
    local args = { }
