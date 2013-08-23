@@ -1,61 +1,186 @@
 Monitoring
 ==========
 
-#### Monitoring variables
+The Monitoring module is a Rule Engine that allows writing simple scriplet to
+implement basic logic, based on a set of events (called triggers), executing some
+function (called actions).
+
+The general idea of the Monitoring Script Engine is to instanciate your triggers and
+actions and then connect them. The rule language is actually based on Lua which make easy
+to write clean and simple rules to implement your logic. Scriptlets can be loaded and unloaded dynamically
+in the system (See monitoring module APIs).
+
+The Monitoring Script Engine comes with a set of predefined triggers and actions that can be
+used in a scriptlet.
+
+
+
+
+## Predefined triggers
+
+### onboot
+
+~~~~{.lua}
+onboot()
+~~~~
+
+Activated when the agent is started, usually when the device boots (depends on how it is ported).
+
+### onconnect
+
+~~~~{.lua}
+onconnect()
+~~~~
+
+Activated before a connection with the Device Management Server is done.
+        
+> **Note** this trigger is temporarily unavailable (need to work on the server connector module of the agent)
+
+### onperiod
+
+~~~~{.lua}
+onperiod(p)
+~~~~
+
+Activated on a timer:
+
+* `p` > 0 means a periodic timer.
+* `p` <= 0 means a one shot timer.
+* `p` is in seconds.
+
+
+### ondate
+
+~~~~{.lua}
+ondate(cron)
+~~~~
+
+Activated on a date. This date is specified with a cron entry (see timer.cron documetnation for format).
+
+Ex: With the compatible Unix CRON syntax, `"22 7 * * *"` means every day at 7:22 am
+
+### onchange
+
+~~~~{.lua}
+onchange(...)
+~~~~
+
+Activated when one of the variable from the list changes.
+        
+`...` is a variable number of variable to monitor, named as string: ex `"system.batterylevel"`, `"user.somevar"`, etc.
+  
+The first argument can also be a table containing all the variables, in that case the remaining args are ignored.
+
+> **Note** the action functions will be given a table containing the changed variables and their value as first argument
+
+### onhold
+
+~~~~{.lua}
+onhold(timeout, ...)
+~~~~
+
+Activated when none of the listed variables change for the `timeout` amount of time.
+
+- if `timeout` > 0 then once activated, the trigger is re-armed only when a variable changes.
+- if `timeout`timeout < 0 then the trigger is automatically re-armed.
+- `...` is a list of variable as strings.
+
+> **Note** the action functions will be given a table containing the variables and the value that caused the last rearm of the holding timer, as first argument
+
+
+### onthreshold
+
+~~~~{.lua}
+onthreshold(threshold, var, edge)
+~~~~
+
+Activated when a value traverse a `threshold` (previous and new value are opposite side of the `threshold` value)
+when `edge` is specified it can be one of `"up"`, `"down"`, `"both"` meaning only triggering on rising edge or falling edge, or on both.
+
+- an `"up"` edge is detected when `oldval` < `threshold` and `newval` >= `threshold`
+- a `"down"` edge is detected when `oldval` >= `threshold` and `newval` < `threshold`
+- the default is `"both"` edge
+
+
+
+### ondeadband
+
+~~~~{.lua}
+ondeadband(deadband, var)
+~~~~
+
+Activated when a value goes outside the `deadband` range: activated if `abs(newval-oldval) >= deadband`.
+        
+`oldval` is updated when the trigger is activated.
+
+
+
+## Predefined actions
+
+Actions are regular Lua functions. Most of the framework API can be used for that purpose.
+        
+For typical actions, see the [Racon Lua library](../agent_connector_libraries/Racon_Lua_library.html).
+
+
+## Filtering and connecting rules
+
+The system provides two additional functions to write the rule scriplets.
+        
+### connect
+
+~~~~{.lua}
+connect(trigger, action)
+~~~~
+
+Connects a `trigger` to an `action`. The action will be executed each time the trigger is activated.
+
+Optionally some triggers will pass some parameters to the action function. See the trigger documentation for more details.
+
+
+### filter
+
+~~~~{.lua}
+filter(test, trigger)
+~~~~
+
+Filter a trigger given a test function.
+
+ * `test` is a function that returns a boolean value: `true`  means the actions are executed
+ * `trigger` output of a trigger function.
+
+In filter returns a new trigger that has the original trigger behavior filtered by the `test` function.
+
+Example:
+
+~~~~{.lua}
+connect(
+    filter(
+           function() return not system.externalpower end,
+           onchange("system.batterylevel")),
+    function() print("Battery Level Changed") end)
+~~~~
+
+will only print the battery level when it changes *and* the power cord is unplugued.
+
+
+
+## Monitoring variables
 
 Each monitoring script has its own execution environment. It means that
-writing a lua variable will not be visible from another monitoring
+a global lua variable will not be visible from another monitoring
 script.
 
-In addition to the individual environment the Monitoring engine adds
-several tables where to read and write other variables.
+Scriptlets can register events on device tree variable changes. The whole device tree is accessible,
+provided the scriptlet has the correct permissions.
 
-- **system**: this table holds all system variables. Usually those
-  variables are used in read only.
-- **user**: this table holds all the user defined variables.
-- **global**: this is a non-monitored table. It can be use to store
-  static data.
-- **persist**: this is a non-monitored and persisted table. It can
-  be used to store data that will survive reboots.
+The device tree structure depends heavily on what [Tree Manager](Tree_Manager.html) handlers (extensions) has
+been ported on the device.
 
-#### Monitoring variables access
+The following list is a guideline to name variables in an homogenous way across devices. Some of there variables might
+not be available depending on your hardware and how Mihini was ported on the device.
 
-Let's say that in the following examples we want to get the Cellular
-RSSI value.
 
-##### in a script:
-
-In a script all variables can be accessed in a *natural* Lua way.
-
-~~~~{.lua}
-local rssi = system.cellular.rssi
-~~~~
-
-##### using Data Reading:
-
-M3DA ReadNode command can be used to read any varaible.
-
-~~~~ {.lua}
-Command name: ReadNode
-Command path: @sys
-Command arg#1: monitoring.system.cellular.rssi
-~~~~
-
-##### in Agent context:
-
-In a global Lua environement (in Agent code or in the Lua shell
-attached to the Agent).
-
-~~~~{.lua}
-local rssi = Monitoring.vars.system.cellular.rssi
-~~~~
-
-#### System variables
-
-The following system variables are available, depending on what the
-different hardware may provide.
-
-##### Cellular
+### Cellular
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------
 Variable name                Variable Type        Variable description                    Available on
@@ -69,7 +194,7 @@ cellular.imei                string               Cellular IMEI                 
 cellular.imsi                string               SIM IMSI number                         On any device that support the standard AT+CIMI AT command
 ------------------------------------------------------------------------------------------------------------------------------------------------------
 
-##### Power
+### Power
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------
 Variable name                Variable Type        Variable description                    Available on
@@ -81,7 +206,7 @@ externalpower                boolean              true if the device is powered
                                                   by an external source
 ------------------------------------------------------------------------------------------------------------------------------------------------------
 
-##### Memory / CPU
+### Memory / CPU
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------
 Variable name                Variable Type        Variable description                            Available on
@@ -110,7 +235,7 @@ totalflashused               integer              Total quantity of flash used o
                                                   system
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-##### NetworkManager
+### NetworkManager
 
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -144,83 +269,99 @@ netman.defaultbearer             string               Default (=selected) bearer
                                                       BEARERNAME
 --------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-#### Monitoring Script Engine API
+## Monitoring Engine API
+
+The Monitoring Engine can install and load scripts dynamically.
+
+### Load scriptlets
 
 ~~~~{.lua}
-install(name, script, autoenable)
+-- Load a monitoring script in memory.
+-- name is a string name
+-- script can be either
+--              a string containing a monitoring script
+--              a table string buffer (list of chunk of string)
+--              or an actual Lua function containing the script
+load(name, script)
+
+
+-- Unload (and stop) a monitoring script from memory.
+-- name is a string name, given at loading time (see load() )
+unload(name)
 ~~~~
 
-Install a new monitoring script.\
-**name** is the name identifying the monitoring script\
-**script** is the script content as a Lua string\
-**autoenable** when set to true (i.e. non false value), the script is
-installed and will be automatically enabled on next Agent boot.\
-when set to "now", the script is started right now, but not installed
-nor enabled (test purpose),\
-when set to false value, the script is installed but not enable for
-the next Agent boot,\
-when set to nil (or absent), the enable flag will stay unchanged
-(meaning equal to the flag of a script that was installed with the
-same name)
+### Install scriptlets
 
 ~~~~{.lua}
+-- Install a monitoring script from a file. Installing a script with an already used name will cause the
+-- initial script to be unloaded and uninstalled (replaced by this script)
+--      name is the name given to the script
+--      filename is the path of the file to install
+--      enable is a boolean. true means that the script will enabled (started)
+install(name, filename, enable)
+
+
+-- Uninstall a monitoring script.
+-- This function automatically stop the given script if it was enabled (running).
+--      name is the name given at installation time.
 uninstall(name)
 ~~~~
 
-Uninstall an installed monitoring script.\
-**name** is the name identifying the monitoring script to uninstall
+
+### Manage scriptlets
 
 ~~~~{.lua}
-uninstallall()
+-- Set the enable flag on an already installed script.
+-- Enabling a disabled script will cause a loading, and similarly, disabling an enabled
+-- script will cause an unloading.
+--      name is the name of the script to configure
+--      set is a boolean: true will enable the script, false will disable the script
+enable(name, set)
+
+
+-- List installed or loaded scripts.
+--      type: if type is set to "installed", list the installed scripts
+--            if type is set to "loaded", list the loaded scripts
+list(type)
 ~~~~
 
-Uninstall **all** installed monitoring scripts.
+
+
+## Scriptlets Examples
+
+### Flip a GPIO every 10 seconds
+~~~~{.lua}
+connect(
+    onperiod(10),
+    function() system.gpio[4] = not system.gpio[4] end)
+~~~~
+
+
+### Activate a GPIO when battery is low
 
 ~~~~{.lua}
-enable(name)
+connect(
+    onthreshold(10, "system.batterylevel", "down"),
+    function() system.gpio[4] = true end)
 ~~~~
 
-Enable an installed monitoring script: the script will be started on
-next Agent boot.\
-**name** is the name identifying the monitoring script to enable
+### Send an alarm on high temperature
 
 ~~~~{.lua}
-disable(name)
+local t = onthreshold(55, "system.temperature", "up")
+local a = function()
+    pushdata("alarm.temperature", {value = system.temperature, timestamp = time()})
+end
+connect(t, a)
 ~~~~
 
-Disable an installed monitoring script: the script will not be started
-on next Agent boot.\
-**name** is the name identifying the monitoring script to disable\
-Note: The script remains installed
+### Print when battery level changes
 
 ~~~~{.lua}
-registerextvar(var, pushenable, getvar, varlist)
+connect(
+    filter(
+           function() return not system.externalpower end,
+           onchange("system.batterylevel")),
+    function() print("Battery Level Changed") end)
 ~~~~
-
-This function allows to add additional variables in the monitored
-tables\
-**pushenable** and **getvar** are functions.\
-**pushenable** will be called by the monitoring engine in order to
-enable asynchronous mode\
-**getvar** will be called if asynchronous push mode is not enabled
-and the variable is read.\
-**varlist** argument must be provided only when registering group of
-variables. **varlist** must be either a table (array) that list the
-names of the variables, or a function that returns that table.\
-When successful, this function returns the table that holds the
-monitored variable or group of variables\
-notes:\
-if **pushenable** is a string or a number, then **getvar** is ignored
-and the value of **pushenable** is set as a static value into the
-monitoring variable table\
-**pushenable** and **getvar** can be equal to nil, restricting the
-usage of that variable, according to what is nil\
-**var** can actually a path designating a group of variables, in that
-case it must have a trailing '.'. ex 'system.cellular.'\
-the actual tables will be automatically created by this function\
-**pushenable** and **getvar**, when defined as functions will be
-called with two parameters: the path, and the variable name.
-**pushenable** may be called with a nil variable name, meaning the
-pushenable is on the whole group (=path) of variable.
-
 

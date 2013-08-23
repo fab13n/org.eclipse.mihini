@@ -223,7 +223,7 @@ function setupenv.onthreshold(threshold, var, edge)
 end
 
 
--- Activated when a values goes outside a limited range: activated if abs(newval-oldval) >= deadband
+-- Activated when a value goes outside a limited range: activated if abs(newval-oldval) >= deadband
 -- oldval is updated when the trigger is activated
 function setupenv.ondeadband(deadband, var)
     checks('number', 'string')
@@ -251,9 +251,10 @@ end
 -- actions: output of a trigger function.
 -- Example: connect(filter(function() return not system.onpower end, onchange("system.batterylevel")), function() print("Battery Level Changed") end)
 --      will only print when battery level changes and the power cord is unplugued.
-function setupenv.filter(test, actions)
+function setupenv.filter(test, trigger)
     checks('function', 'table')
-        
+
+    local actions = trigger
     if not actions.filter then
         actions.filter = test
     elseif type(actions.filter) == "function" then
