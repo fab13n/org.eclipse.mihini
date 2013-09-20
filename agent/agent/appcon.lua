@@ -438,7 +438,7 @@ local function init()
 
     -- register rest commands
     if type(config.rest) == "table" and config.rest.activate == true then
-       local rest = require 'agent.rest'
+       local rest = require 'web.rest'
        rest.register("application$", "GET", list)
        rest.register("application/[%w%.]+", "GET", function(env) return status(env["suburl"]) end)
        rest.register("application/[%w%.]+/start", "PUT", function(env) return start(env["suburl"]:gsub("/start", "")) end)
