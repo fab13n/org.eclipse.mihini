@@ -114,7 +114,7 @@
 
 
     log = {}
-    log.defaultlevel = "DEBUG" -- default log level: can be one of NONE, ERROR, WARNING, INFO, DETAIL, DEBUG, ALL. See log.lua for details
+    log.defaultlevel = "INFO" -- default log level: can be one of NONE, ERROR, WARNING, INFO, DETAIL, DEBUG, ALL. See log.lua for details
     log.moduleslevel = { }
     --log.moduleslevel.GENERAL = "ALL"    -- per module log level
     --log.moduleslevel.SERVER  = "INFO"   -- per module log level

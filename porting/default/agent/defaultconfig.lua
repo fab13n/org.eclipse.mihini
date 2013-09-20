@@ -131,13 +131,13 @@
 
 
     log = {}
-    log.defaultlevel = "DEBUG" -- default log level: can be one of NONE, ERROR, WARNING, INFO, DETAIL, DEBUG, ALL. See log.lua for details
+    log.defaultlevel = "INFO" -- default log level: can be one of NONE, ERROR, WARNING, INFO, DETAIL, DEBUG, ALL. See log.lua for details
     log.moduleslevel = { }
     --log.moduleslevel.GENERAL = "ALL"    -- per module log level
     --log.moduleslevel.SERVER  = "INFO"   -- per module log level
     log.moduleslevel.SCHED     = "INFO"   -- per module log level
     log.moduleslevel.TREEMGR   = "DETAIL" -- per module log level
-    log.enablecolors = false
+    log.enablecolors = true
 
     -- change default format for all logs
     --log.format = "%t %m-%s: %l"
