@@ -37,63 +37,70 @@ cat << EOF > /etc/init.d/mihini
 # Description: Enable application framework or M2M services (like device management) provided by mihini agent.
 ### END INIT INFO
 
-DESC="Mihini agent"
+DESC="Eclipse Mihini M2M service"
 NAME=Mihini
 DAEMON=/opt/mihini/bin/appmon_daemon
 AGENT=/opt/mihini/bin/agent
 ROOTDIR=/opt/mihini
+APPMON_PIDFILE=/run/mihini.appmon.pid
+AGENT_PIDFILE=/run/mihini.agent.pid
 
 . /lib/lsb/init-functions
 
 test -f \$DAEMON || exit 0
 test -f \$AGENT || exit 0
 
+do_start()
+{
+    log_daemon_msg "Starting \$DESC" "Applications daemon"
+    start-stop-daemon --start --quiet --pidfile \$APPMON_PIDFILE --exec \$DAEMON -- -w \$ROOTDIR -h mihini -u mihini -g mihini -n 5
+    log_end_msg \$?
+    test -e \$APPMON_PIDFILE || pidof appmon_daemon > \$APPMON_PIDFILE
+
+    log_daemon_msg "Starting \$DESC" "Agent"
+    start-stop-daemon --start --quiet --make-pidfile --pidfile \$AGENT_PIDFILE --chuid root:mihini --chdir \$ROOTDIR --background --exec \$AGENT
+    log_end_msg \$?
+}
+
+do_stop()
+{
+    log_daemon_msg "Stopping \$DESC" "Agent"
+    echo "destroy" | nc localhost 4242 > /dev/null 2>&1
+    start-stop-daemon --stop --quiet --signal TERM --pidfile \$AGENT_PIDFILE
+    log_end_msg \$?
+
+    log_daemon_msg "Stopping \$DESC" "Applications daemon"
+    start-stop-daemon --stop --quiet --oknodo --signal TERM --pidfile \$APPMON_PIDFILE 2>/dev/null
+    log_end_msg \$?
+    rm -f \$APPMON_PIDFILE \$AGENT_PIDFILE
+}
+
 case "\$1" in
     start)
-        if [ ! "`pidof \$DAEMON`" ]
-        then
-            \$DAEMON -a \$AGENT -w \$ROOTDIR -h mihini -u mihini -g mihini -n 5 2>&1 | logger -t Mihini &
-            if [ "\$?" -eq 0  ]
-            then
-                log_success_msg "\$NAME started"
-            else
-                log_failure_msg "\$NAME failed to start"
-            fi
-            sleep 1
-        fi
+        do_start
         ;;
 
     stop)
-        log_daemon_msg "Stopping \$NAME agent"
-        echo "destroy" | nc localhost 4242 > /dev/null 2>&1
-        killproc \$AGENT
-        log_end_msg \$?
-
-        log_daemon_msg "Stopping \$NAME daemon"
-        killproc \$DAEMON
-        log_end_msg \$?
-        sleep 1
+        do_stop
         ;;
 
     restart)
-        \$0 stop
-        \$0 start
-        sleep 3
-        \$0 status
+        do_stop
+        do_start
         ;;
 
     status)
-        status_of_proc \$DAEMON "\$NAME daemon"
+        status_of_proc \$DAEMON "\$NAME applications daemon"
         status_of_proc \$AGENT "\$NAME agent"
         ;;
 
     purge)
-        rm -rf /var/opt/mihini/persist/*
+        rm -rf /var/opt/mihini/persist
         log_daemon_msg "Mihini's persist folder cleared"
         ;;
 
     *)
-      echo "Usage: \$0 {start|stop|restart|status|purge}"
+      echo "Usage: $0 {start|stop|restart|status|purge}"
       exit 1
       ;;
 esac
