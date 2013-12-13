@@ -115,9 +115,12 @@ function web.handle_request (cx, env)
 
    if not page then web.send_error (env, 404, "No handler found for " .. env.url); return end
    if type(page) ~= 'table' then page={content=page} end
-   if page[env.method] then page = page[env.method] end
-   if not page.content then web.send_error (env, 404, "HTTP/" .. env.method .. " is not supported for " .. env.url); return end
-
+   if page[env.method] then
+       page = page[env.method]
+       if not page.content then
+           web.send_error (env, 404, "HTTP/" .. env.method .. " is not supported for " .. env.url); return
+       end
+   end
    env.page = page
 
    local res, err
