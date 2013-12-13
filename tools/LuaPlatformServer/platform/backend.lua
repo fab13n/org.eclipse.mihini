@@ -30,8 +30,10 @@ function M.to_device(message)
     local function src_factory()
         return ltn12.source.string(str)
     end
-    M.session :send (src_factory)
-    table.insert(platform.history, {os.date(), true, message})
+    sched.run(function()
+        M.session :send (src_factory)
+        table.insert(platform.history, {os.date(), true, message})
+    end)
 end
 
 function M.msghandler(serialized_message)
