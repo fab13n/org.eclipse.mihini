@@ -8,8 +8,7 @@
 # https://github.com/raspberrypi/tools.git
 # get it
 # then configure next var using the place where the toolchain was outputed)
-GET(ENV{HOME} HOME)
-SET(RASPI_LINARO_BASE ${HOME}/tools/arm-bcm2708/gcc-linaro-arm-linux-gnueabihf-raspbian/)
+SET(RASPI_LINARO_BASE /home/fabien/src/raspi/tools/arm-bcm2708/gcc-linaro-arm-linux-gnueabihf-raspbian)
 
 # specify the cross compiler
 SET(CMAKE_C_COMPILER   ${RASPI_LINARO_BASE}/bin/arm-linux-gnueabihf-gcc)
