@@ -48,6 +48,7 @@ AGENT=/opt/mihini/bin/agent
 ROOTDIR=/opt/mihini
 APPMON_PIDFILE=/run/mihini.appmon.pid
 AGENT_PIDFILE=/run/mihini.agent.pid
+MIHINI_LOG_FILE=/var/log/mihini
 
 . /lib/lsb/init-functions
 
@@ -62,7 +63,9 @@ do_start()
     test -e \$APPMON_PIDFILE || pidof appmon_daemon > \$APPMON_PIDFILE
 
     log_daemon_msg "Starting \$DESC" "Agent"
-    start-stop-daemon --start --quiet --make-pidfile --pidfile \$AGENT_PIDFILE --chuid root:mihini --chdir \$ROOTDIR --background --exec \$AGENT
+    touch \$MIHINI_LOG_FILE
+    chown root:mihini \$MIHINI_LOG_FILE
+    start-stop-daemon --start --quiet --make-pidfile --pidfile \$AGENT_PIDFILE --chuid root:mihini --chdir \$ROOTDIR --background --no-close --exec \$AGENT > \$MIHINI_LOG_FILE 2>&1
     log_end_msg \$?
 }
 
