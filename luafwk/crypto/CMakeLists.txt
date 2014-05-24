@@ -19,6 +19,7 @@ INCLUDE_DIRECTORIES(
     ${LIB_HMAC_MD5_SOURCE_DIR}/hmac_rfc2104
     ${LIB_HMAC_MD5_SOURCE_DIR}/md5_rfc1321
     ${LIB_SHA1_SOURCE_DIR}
+    ${LIB_SHA2_SOURCE_DIR}
     ${LIB_MIHINI_KEYSTORE_SOURCE_DIR}
     ${LIB_OPENAES_SOURCE_DIR})
 
@@ -31,7 +32,7 @@ TARGET_LINK_LIBRARIES(crypto_sha1 lib_sha1)
 SET_TARGET_PROPERTIES(crypto_sha1 PROPERTIES OUTPUT_NAME sha1)
 
 ADD_LUA_LIBRARY(crypto_hmac hmac.c DESTINATION crypto)
-TARGET_LINK_LIBRARIES(crypto_hmac lib_hmac_md5 lib_sha1 lib_keystore)
+TARGET_LINK_LIBRARIES(crypto_hmac lib_hmac_md5 lib_sha1 lib_sha2 lib_keystore)
 SET_TARGET_PROPERTIES(crypto_hmac PROPERTIES OUTPUT_NAME hmac)
 
 ADD_LUA_LIBRARY(crypto_keystore keystore.c DESTINATION crypto)

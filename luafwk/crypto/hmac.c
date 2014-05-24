@@ -33,25 +33,26 @@
 #include <malloc.h>
 #include "md5.h"
 #include "sha1.h"
+#include "sha256.h"
 #include "lauxlib.h"
 #include "keystore.h"
 
-#define DIGEST_LEN     16
-#define HEX_DIGEST_LEN (2*DIGEST_LEN)
-#define KEY_LEN        64
+#define MAX_DIGEST_LEN     (256/8)
+#define BLOCK_SIZE         (512/8)
 
 struct hmac_ctx_t {
-    enum { HASH_MD5, HASH_SHA1 } hash;
-    union { MD5_CTX md5; SHA1Context sha1; } u;
-    unsigned char key[KEY_LEN];
+    enum { HASH_MD5, HASH_SHA1, HASH_SHA2 } hash;
+    union { MD5_CTX md5; SHA1Context sha1; sha256_context sha2; } u;
+    unsigned char key[BLOCK_SIZE];
     int digested;
+    int digest_length;
 };
 
 static const char figures[]="0123456789abcdef";
 
-static void bin2hex( char hex[HEX_DIGEST_LEN], unsigned char bin[DIGEST_LEN]) {
+static void bin2hex( char *hex, unsigned char *bin, int length) {
     int i;
-    for( i=0; i<DIGEST_LEN; i++) {
+    for( i=0; i<length; i++) {
         int byte = bin[i];
         hex[2*i]   = figures[byte>>4];
         hex[2*i+1] = figures[byte&0xf];
@@ -63,20 +64,22 @@ static struct hmac_ctx_t *checkhmac ( lua_State *L, int idx) {
     return (struct hmac_ctx_t *) luaL_checkudata( L, idx, "HMAC_CTX");
 }
 
-
 static void h_init( struct hmac_ctx_t *ctx) {
-    if( HASH_MD5 == ctx->hash) MD5Init( & ctx->u.md5);
-    else SHA1Reset( & ctx->u.sha1);
+    if( HASH_MD5 == ctx->hash)       MD5Init( & ctx->u.md5);
+    else if( HASH_SHA1 == ctx->hash) SHA1Reset( & ctx->u.sha1);
+    else if( HASH_SHA2 == ctx->hash) sha256_starts( & ctx->u.sha2);
 }
 
 static void h_update( struct hmac_ctx_t *ctx, unsigned char *data, size_t length) {
-    if( HASH_MD5 == ctx->hash) MD5Update( & ctx->u.md5, data, length);
-    else SHA1Input( & ctx->u.sha1, data, length);
+    if( HASH_MD5 == ctx->hash)       MD5Update( & ctx->u.md5, data, length);
+    else if( HASH_SHA1 == ctx->hash) SHA1Input( & ctx->u.sha1, data, length);
+    else if( HASH_SHA2 == ctx->hash) sha256_update( & ctx->u.sha2, data, length);
 }
 
-static void h_digest( struct hmac_ctx_t *ctx, unsigned char digest[DIGEST_LEN]) {
-    if( HASH_MD5 == ctx->hash) MD5Final( digest, & ctx->u.md5);
-    else SHA1Result( & ctx->u.sha1, digest);
+static void h_digest( struct hmac_ctx_t *ctx, unsigned char *digest) {
+    if( HASH_MD5 == ctx->hash)       MD5Final( digest, & ctx->u.md5);
+    else if( HASH_SHA1 == ctx->hash) SHA1Result( & ctx->u.sha1, digest);
+    else if( HASH_SHA2 == ctx->hash) sha256_finish( & ctx->u.sha2, digest);
 }
 
 /* hmac(hash_name, idx_K) returns a ctx as userdata. */
@@ -84,22 +87,38 @@ static int api_hmac( lua_State *L) {
     int i;
     struct hmac_ctx_t *ctx = lua_newuserdata( L, sizeof( * ctx));
     const char *hash_name = luaL_checkstring( L, 1);
-    int idx_K = luaL_checkinteger( L, 2)-1;
 
-    if( ! strcmp( hash_name, "sha1")) { ctx->hash = HASH_SHA1; }
-    else if( ! strcmp( hash_name, "md5")) { ctx->hash = HASH_MD5; MD5Init( & ctx->u.md5); }
+    /* Select hash. */
+    if( ! strcmp( hash_name, "sha1"))      { ctx->hash = HASH_SHA1; ctx->digest_length = 160/8; }
+    else if( ! strcmp( hash_name, "sha2")) { ctx->hash = HASH_SHA2; ctx->digest_length = 256/8; }
+    else if( ! strcmp( hash_name, "md5"))  { ctx->hash = HASH_MD5;  ctx->digest_length = 128/8; }
     else { lua_pushnil( L); lua_pushliteral( L, "hash function not supported"); return 2; }
 
-    bzero( & ctx->key, KEY_LEN);
-    i = get_plain_bin_key( idx_K, ctx->key);
-    if( i) { lua_pushnil( L); lua_pushinteger( L, i); return 2; }
+    /* Retrieve the key. */
+    bzero( & ctx->key, BLOCK_SIZE);
+    if( lua_isnumber( L, 2)) {
+      int idx_K = luaL_checkinteger( L, 2)-1;
+      i = get_plain_bin_key( idx_K, ctx->key);
+      if( i) { lua_pushnil( L); lua_pushinteger( L, i); return 2; }
+    } else if( lua_isstring( L, 2)) {
+      size_t raw_key_len;
+      const char *raw_key = luaL_checklstring( L, 2, & raw_key_len);
+      if( raw_key_len > BLOCK_SIZE) {
+        lua_pushnil( L); lua_pushliteral( L, "long keys support not implemented"); return 2;
+        // TODO: if #key>BLOCK_SIZE then key=hash(key)
+      }
+      memcpy( ctx->key, raw_key, raw_key_len); // Automatically zero-padded if needed
+    } else if(! lua_isnone( L, 2)) {
+      luaL_error( L, "2nd argument must be an integer (key index) or a string (key)");
+    }
+
     ctx->digested = 0; // digest not computed yet
     luaL_newmetatable( L, "HMAC_CTX");
     lua_setmetatable( L, -2);
-    for( i=0; i<KEY_LEN; i++) ctx->key[i] ^= 0x36; // convert key into k_ipad
+    for( i=0; i<BLOCK_SIZE; i++) ctx->key[i] ^= 0x36; // convert key into k_ipad
     h_init( ctx);
-    h_update( ctx, ctx->key, KEY_LEN);
-    for( i=0; i<KEY_LEN; i++) ctx->key[i] ^= 0x36 ^ 0x5c; // convert key from k_ipad to k_opad
+    h_update( ctx, ctx->key, BLOCK_SIZE);
+    for( i=0; i<BLOCK_SIZE; i++) ctx->key[i] ^= 0x36 ^ 0x5c; // convert key from k_ipad to k_opad
     return 1;
 }
 
@@ -119,23 +138,23 @@ static int api_hmac_update( lua_State *L) {
  * as an hexadecimal string if it's false. */
 static int api_hmac_digest( lua_State *L) {
     struct hmac_ctx_t *ctx = checkhmac ( L, 1);
-    unsigned char digest[DIGEST_LEN];
+    unsigned char digest[MAX_DIGEST_LEN];
 
     if( ctx->digested) { lua_pushnil( L); lua_pushliteral( L, "digest already computed"); return 2; }
     ctx->digested = 1;
 
     h_digest( ctx, digest);  // (inner) digest = HASH(k_ipad..msg)
     h_init( ctx);            // reuse hash ctx to compute outer hash
-    h_update( ctx, ctx->key, KEY_LEN); // key = k_opad
-    h_update( ctx, digest, DIGEST_LEN);
-    h_digest(ctx, digest); // (outer) digest = MD5(k_opad..inner digest)
+    h_update( ctx, ctx->key, BLOCK_SIZE); // key = k_opad
+    h_update( ctx, digest, ctx->digest_length);
+    h_digest(ctx, digest); // (outer) digest = HASH(k_opad..inner digest)
 
     if( lua_toboolean( L, 2)) {
-        lua_pushlstring( L, (const char *) digest, DIGEST_LEN);
+        lua_pushlstring( L, (const char *) digest, ctx->digest_length);
     } else {
-        char hex[HEX_DIGEST_LEN];
-        bin2hex( hex, digest);
-        lua_pushlstring( L, (const char *) hex, HEX_DIGEST_LEN);
+        char hex[2*MAX_DIGEST_LEN];
+        bin2hex( hex, digest, ctx->digest_length);
+        lua_pushlstring( L, (const char *) hex, 2*ctx->digest_length);
     }
 
     return 1;
@@ -181,5 +200,3 @@ int luaopen_crypto_hmac( lua_State *L) {
     return 1;
 #undef REG
 }
-
-
