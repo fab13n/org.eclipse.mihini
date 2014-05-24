@@ -54,7 +54,7 @@ static int api_sha1( lua_State *L) {
     SHA1Context *ctx = lua_newuserdata( L, sizeof( SHA1Context));
     luaL_newmetatable( L, "SHA1_CTX");
     lua_setmetatable( L, -2);
-    MD5Init( ctx);
+    SHA1Reset( ctx);
     return 1;
 }
 
@@ -64,7 +64,7 @@ static int api_sha1_update( lua_State *L) {
     SHA1Context *ctx = checksha1 ( L, 1);
     size_t datalen;
     unsigned char *data = (unsigned char *) luaL_checklstring( L, 2, & datalen);
-    MD5Update( ctx, data, datalen);
+    SHA1Input( ctx, data, datalen);
     lua_pushvalue( L, 1);
     return 1;
 }
@@ -75,7 +75,7 @@ static int api_sha1_update( lua_State *L) {
 static int api_sha1_digest( lua_State *L) {
     SHA1Context *ctx = checksha1 ( L, 1);
     unsigned char digest[DIGEST_LEN];
-    MD5Final( digest, ctx);
+    SHA1Result( ctx, digest);
     if( lua_toboolean( L, 2)) {
         lua_pushlstring( L, (const char *) digest, DIGEST_LEN);
     } else {
@@ -92,7 +92,7 @@ static int sha1_filter_closure( lua_State *L) {
     if( ! lua_isnil( L, 1)) {
         size_t size;
         const char *data = luaL_checklstring( L, 1, & size);
-        MD5Update( ctx, (unsigned char *) data, size);
+        SHA1Input( ctx, (unsigned char *) data, size);
         lua_pushvalue( L, 1);
         return 1;
     }
