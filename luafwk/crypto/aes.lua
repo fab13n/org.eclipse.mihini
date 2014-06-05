@@ -62,7 +62,7 @@ function M.encrypt_filter(chaining, length, nonce, keyidx)
         if lastsent then return nil
         elseif data=='' then return ''
         elseif data==nil then -- end-of-stream, flush last padded chunk
-            local n = 16 - #buffer
+            local n = 16 - #buffer -- number of padding bytes
             assert(0<n and n<=16)
             buffer = buffer .. string.char(n) :rep(n)
             -- There a header + IV, added by OpenAES, to remove.
@@ -75,7 +75,7 @@ function M.encrypt_filter(chaining, length, nonce, keyidx)
             else -- send every completed 16-bytes chunks
                 local nkept = #buffer % 16 -- how many bytes must be kept in buffer
                 local tosend = buffer :sub (1, -nkept-1)
-                local tokeep = buffer :sub (-nkept, -1)
+                local tokeep = nkept==0 and '' or buffer :sub (-nkept, -1)
                 buffer = tokeep
                 local result = core.encrypt(oaes, tosend) :sub(33, -1)
                 return result
