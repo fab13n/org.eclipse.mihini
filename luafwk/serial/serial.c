@@ -196,36 +196,26 @@ static int setBaudrate(unsigned int baudrate, struct termios* term)
 {
   switch (baudrate)
   {
-    case 1200:
-    {
-      cfsetspeed(term, B1200);
-      break;
-    }
-    case 9600:
-    {
-      cfsetspeed(term, B9600);
-      break;
-    }
-    case 19200:
-    {
-      cfsetspeed(term, B19200);
-      break;
-    }
-    case 38400:
-    {
-      cfsetspeed(term, B38400);
-      break;
-    }
-    case 57600:
-    {
-      cfsetspeed(term, B57600);
-      break;
-    }
-    case 115200:
-    {
-      cfsetspeed(term, B115200);
-      break;
-    }
+#define SET_SPEED( n) case n: cfsetspeed(term, B##n); break
+  SET_SPEED( 50);
+  SET_SPEED( 75);
+  SET_SPEED( 110);
+  SET_SPEED( 134);
+  SET_SPEED( 150);
+  SET_SPEED( 200);
+  SET_SPEED( 300);
+  SET_SPEED( 600);
+  SET_SPEED( 1200);
+  SET_SPEED( 1800);
+  SET_SPEED( 2400);
+  SET_SPEED( 4800);
+  SET_SPEED( 9600);
+  SET_SPEED( 19200);
+  SET_SPEED( 38400);
+  SET_SPEED( 57600);
+  SET_SPEED( 115200);
+  SET_SPEED( 230400);
+#undef SET_SPEED
     default:
       printf("SERIAL: unsupported baudrate: %d\n", baudrate);
       return -1;
@@ -241,28 +231,30 @@ static int getBaudrate(struct termios* term)
 
   switch(s)
   {
-    case B1200:
-      s = 1200;
-      break;
-    case B9600:
-      s = 9600;
-      break;
-    case B19200:
-      s = 19200;
-      break;
-    case B38400:
-      s = 38400;
-      break;
-    case B57600:
-      s = 57600;
-      break;
-    case B115200:
-      s = 115200;
-      break;
-    default:
-      printf("SERIAL: Unknown speed setting: %d!\n", s);
-      s = 0;
-      break;
+#define GET_SPEED( n) case B##n: s=n; break
+  GET_SPEED( 0);
+  GET_SPEED( 50);
+  GET_SPEED( 75);
+  GET_SPEED( 110);
+  GET_SPEED( 134);
+  GET_SPEED( 150);
+  GET_SPEED( 200);
+  GET_SPEED( 300);
+  GET_SPEED( 600);
+  GET_SPEED( 1200);
+  GET_SPEED( 1800);
+  GET_SPEED( 2400);
+  GET_SPEED( 4800);
+  GET_SPEED( 9600);
+  GET_SPEED( 19200);
+  GET_SPEED( 38400);
+  GET_SPEED( 57600);
+  GET_SPEED( 115200);
+  GET_SPEED( 230400);
+  default:
+    printf("SERIAL: Unknown speed setting: %d!\n", s);
+    s = 0;
+    break;
   }
   return s;
 }
@@ -424,6 +416,34 @@ static int l_open(lua_State* L)
 
   return 1;
 }
+
+#if 0
+static int l_flush(lua_State* L)
+{
+  SerialPort* sp = (SerialPort*) luaL_checkudata( L, 1, MODULE_NAME);
+  const char *dir = luaL_checkstring( L, 2);
+  int status;
+
+  status=check_port( L, sp);
+  if( status != 0 ) return status;
+
+  int flush_read = strchr( qselector, "R") || strchr( qselector, "r");
+  int flush_write = strchr( qselector, "W") || strchr( qselector, "w");
+  int queue_selector =
+    flush_read && flush_write ? TCIOFLUSH :
+    flush_read ? TCIFLUSH :
+    flush_write ? TCOFLUSH : 0;
+  status = tcflush( sp->fd, queue_selector);
+  if( status) {
+    lua_pushnil( L);
+    lua_pushinteger( L, status);
+    return 2;
+  } else {
+    lua_pushliteral( L, "ok");
+    return 1;
+  }
+}
+#endif
 
 static int l_write(lua_State* L)
 {
