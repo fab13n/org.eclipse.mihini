@@ -180,12 +180,12 @@ function web.handle_request (cx, env)
       end
       local headers_sent = false
       local function echo(...)
-	 if not headers_sent then
-	     cx :send (env.response.."\r\n")
-	     for k,v in pairs (env.response_headers) do cx :send (k..': '..v..'\r\n') end
-	     cx :send '\r\n' -- end of headers
-	     headers_sent = true
-	 end
+         if not headers_sent then
+             cx :send (env.response.."\r\n")
+             for k,v in pairs (env.response_headers) do cx :send (k..': '..v..'\r\n') end
+             cx :send '\r\n' -- end of headers
+             headers_sent = true
+         end
          local chunk = table.concat{...}
          if #chunk>0 then
             cx :send (string.format ("%X\r\n", #chunk)..chunk.."\r\n")
