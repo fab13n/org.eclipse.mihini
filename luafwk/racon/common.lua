@@ -19,9 +19,9 @@ local M = { initialized=false }
 -- force the init function to use a socket for IPC communications
 M.FORCE_SOCKETS = false
 -- address of the remote agent
-M.address       = '127.0.0.1'
+M.default_address       = '127.0.0.1'
 -- port of the remote agent
-M.port          = 9999
+M.default_port          = 9999
 -- number of reconnection tried when error "ipc broken" is triggered
 M.retry         = 10
 -- time used between each reconnection
@@ -74,18 +74,21 @@ local function emp_reconnect()
    return nil, "failed"
 end
 
-function M.init()
+function M.init(address, port)
+    checks('?string', '?number')
+    address = address or M.default_address
+    port    = port    or M.default_port
     if M.initialized then return "already initialized" end
 
     -- detect best IPC choice
     local agent = rawget(_G, "agent")
     if M.FORCE_SOCKETS or not (agent and agent.asscon) then
         local socket = require "socket"
-        M.socket = assert(socket.connect(M.address, M.port))
+        M.socket = assert(socket.connect(address, port))
     else
         local ipc     = require "racon.ipc"
         local clients = require "agent.asscon"
-        local a, b = ipc.new()
+        local a, b = ipc.new(address, port)
         M.socket = a
         sched.run (clients.connectionhandler, b)
     end

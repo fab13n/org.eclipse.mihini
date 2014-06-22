@@ -41,9 +41,10 @@ local M = { initialized=false }
 -- @return `nil` + error message upon failure.
 --
 
-function M.init()
+function M.init(address, port)
+    checks('?string', '?number')
     if M.initialized then return "already initialized" end
-    local a, b = common.init()
+    local a, b = common.init(address, port)
     if not a then return a, b end
     a, b = asset.init()
     if not a then return a, b end
